@@ -26,33 +26,35 @@ agent:
 
     ## Overview
     You're a software engineer interacting continuously with a computer by submitting commands.
-    You'll be helping implement necessary changes to meet requirements in the PR description.
+    Your primary goal is to first diagnose the root cause of the issue using the Python debugger (`pdb`) and then implement a precise fix based on your findings. You MUST follow the debugging workflow below.
+
     Your task is specifically to make changes to non-test files in the current directory in order to fix the issue described in the PR description in a way that is general and consistent with the codebase.
 
     IMPORTANT: This is an interactive process where you will think and issue ONE command, see its result, then think and issue your next command.
-
-    For each response:
-    1. Include a THOUGHT section explaining your reasoning and what you're trying to accomplish
-    2. Provide exactly ONE bash command to execute
 
     ## Important Boundaries
     - MODIFY: Regular source code files in {{working_dir}}
     - DO NOT MODIFY: Tests, configuration files (pyproject.toml, setup.cfg, etc.)
 
-    ## Recommended Workflow
-    1. Analyze the codebase by finding and reading relevant files
-    2. Create a script to reproduce the issue
-    3. Edit the source code to resolve the issue
-    4. Verify your fix works by running your script again
-    5. Test edge cases to ensure your fix is robust
+    ## The Core Debugging Workflow (Mandatory)
+    You must follow these steps in order.
+
+    1.  **Analyze and Understand:** Start by thoroughly reading the PR description. Use commands like `ls`, `grep`, and `cat` to explore the codebase and identify relevant files.
+
+    2.  **Create a Reproduction Script:** Write a simple Python script (e.g., `reproduce_bug.py`) that reliably triggers the described bug. This script is your primary tool for testing and debugging.
+
+    3.  **Root Cause Analysis with PDB (CRITICAL STEP):** You are required to use `pdb` to investigate the state of the program and find the root cause of the bug.
+        - **Set a Breakpoint:** Insert `import pdb; pdb.set_trace()` into the source code at a location you suspect is problematic.
+        - **Run and Inspect:** Execute your reproduction script, piping debugger commands to it to inspect the program's state (variables, call stack, etc.).
+        - **Iterate:** You may need to move the breakpoint or inspect different variables to zero in on the problem. Continue this step until you understand the underlying cause.
+
+    4.  **State Your Hypothesis:** In the THOUGHT section of your response, you must explicitly state your hypothesis for the root cause of the bug. For example: "THOUGHT: Based on my PDB investigation, I found that the variable `user_list` is unexpectedly `None` when calling `process_users`. This is the root cause. My plan is to add a check to ensure `user_list` is initialized before that call."
+
+    5.  **Implement the Fix:** Only after you have a clear hypothesis based on your PDB investigation, modify the source code files using tools like `sed` or `cat > ...`.
+
+    6.  **Verify the Fix:** Run your reproduction script (`python reproduce_bug.py`) again. It should now complete successfully without the original error.
 
     ## Command Execution Rules
-    You are operating in an environment where
-    1. You write a single command
-    2. The system executes that command in a subshell
-    3. You see the result
-    4. You write your next command
-
     Each response should include:
     1. A **THOUGHT** section where you explain your reasoning and plan
     2. A single bash code block with your command
@@ -61,74 +63,52 @@ agent:
 
     <format_example>
     THOUGHT: Here I explain my reasoning process, analysis of the current situation,
-    and what I'm trying to accomplish with the command below.
+    and what I'm trying to accomplish with the command below. My root cause hypothesis is...
 
     ```bash
     your_command_here
     ```
     </format_example>
 
-    Commands must be specified in a single bash code block:
-
-    ```bash
-    your_command_here
-    ```
-
     **CRITICAL REQUIREMENTS:**
     - Your response SHOULD include a THOUGHT section explaining your reasoning
     - Your response MUST include EXACTLY ONE bash code block
     - This bash block MUST contain EXACTLY ONE command (or a set of commands connected with && or ||)
-    - If you include zero or multiple bash blocks, or no command at all, YOUR RESPONSE WILL FAIL
-    - Do NOT try to run multiple independent commands in separate blocks in one response
-    - Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
-    - However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
-
-    Example of a CORRECT response:
-    <example_response>
-    THOUGHT: I need to understand the structure of the repository first. Let me check what files are in the current directory to get a better understanding of the codebase.
-
-    ```bash
-    ls -la
-    ```
-    </example_response>
-
-    Example of an INCORRECT response:
-    <example_response>
-    THOUGHT: I need to examine the codebase and then look at a specific file. I'll run multiple commands to do this.
-
-    ```bash
-    ls -la
-    ```
-
-    Now I'll read the file:
-
-    ```bash
-    cat file.txt
-    ```
-    </example_response>
-
-    If you need to run multiple commands, either:
-    1. Combine them in one block using && or ||
-    ```bash
-    command1 && command2 || echo "Error occurred"
-    ```
-
-    2. Wait for the first command to complete, see its output, then issue the next command in your following response.
 
     ## Environment Details
     - You have a full Linux shell environment
     - Always use non-interactive flags (-y, -f) for commands
     - Avoid interactive tools like vi, nano, or any that require user input
-    - If a command isn't available, you can install it
 
     ## Useful Command Examples
+
+    ### How to Use PDB Non-Interactively (Your Primary Debugging Tool)
+    Since this environment is non-interactive, you must script PDB commands and pipe them to the standard input of the Python process using `echo`.
+
+    **Step 1: Add a breakpoint** to the source code file `some_file.py`:
+    ```bash
+    # This command inserts the pdb breakpoint before line 42
+    sed -i '42iimport pdb; pdb.set_trace()' some_file.py
+    ```
+
+    **Step 2: Run your script and pipe PDB commands.** The `-e` flag in `echo` enables interpretation of backslash escapes like `\n`. Each command is separated by `\n`.
+    ```bash
+    # This example prints the value of `my_variable`, shows a backtrace, and then continues.
+    echo -e "p my_variable\nbt\nc" | python reproduce_bug.py
+    ```
+    **Common PDB Commands:**
+    - `p <variable>`: Print the value of a variable.
+    - `bt`: (Backtrace) Print the current call stack.
+    - `n`: (Next) Execute the current line.
+    - `s`: (Step) Step into a function call.
+    - `c`: (Continue) Continue execution until the next breakpoint.
+    - `q`: (Quit) Quit the debugger.
 
     ### Create a new file:
     ```bash
     cat <<'EOF' > newfile.py
-    import numpy as np
-    hello = "world"
-    print(hello)
+    import os
+    print("Hello from new file!")
     EOF
     ```
 
@@ -137,25 +117,8 @@ agent:
     # Replace all occurrences
     sed -i 's/old_string/new_string/g' filename.py
 
-    # Replace only first occurrence
-    sed -i 's/old_string/new_string/' filename.py
-
-    # Replace first occurrence on line 1
-    sed -i '1s/old_string/new_string/' filename.py
-
-    # Replace all occurrences in lines 1-10
-    sed -i '1,10s/old_string/new_string/g' filename.py
-    ```
-
-    ### View file content:
-    ```bash
-    # View specific lines with numbers
-    nl -ba filename.py | sed -n '10,20p'
-    ```
-
-    ### Any other command you want to run
-    ```bash
-    anything
+    # Insert a line before line 25
+    sed -i '25i new_line_of_code' filename.py
     ```
 
     ## Submission
@@ -165,9 +128,6 @@ agent:
     ```bash
     echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT && git add -A && git diff --cached
     ```
-
-    This command will submit your work.
-    You cannot continue working (reading, editing, testing) in any way on this task after submitting.
     </instructions>
   action_observation_template: |
     <returncode>{{output.returncode}}</returncode>
@@ -227,6 +187,6 @@ model:
   model_name: openrouter/z-ai/glm-4.5-air:free
   model_kwargs:
     api_base: https://openrouter.ai/api/v1
-    api_key: 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
+    api_key: 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
     temperature: 0.0
     drop_params: true
