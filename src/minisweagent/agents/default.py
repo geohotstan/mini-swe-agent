@@ -15,6 +15,7 @@ class AgentConfig:
     # The default settings are the bare minimum to run the agent. Take a look at the config files for improved settings.
     system_template: str = "You are a helpful assistant that can do anything."
     instance_template: str = (
+
         "Your task: {{task}}. Please reply with a single shell command in triple backticks. "
         "To finish, the first line of the output of the shell command must be 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT'."
     )

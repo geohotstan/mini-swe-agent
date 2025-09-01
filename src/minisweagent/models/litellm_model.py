@@ -61,7 +61,13 @@ class LitellmModel:
 
     def query(self, messages: list[dict[str, str]], **kwargs) -> dict:
         response = self._query(messages, **kwargs)
-        cost = litellm.cost_calculator.completion_cost(response)
+
+        # NOTE: cost calculator doesn't always work
+        try:
+            cost = litellm.cost_calculator.completion_cost(response)
+        except:
+            cost = 0.0
+
         self.n_calls += 1
         self.cost += cost
         GLOBAL_MODEL_STATS.add(cost)
